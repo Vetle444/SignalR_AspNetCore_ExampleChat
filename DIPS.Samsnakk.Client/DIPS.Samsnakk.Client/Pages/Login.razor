@@ -1,0 +1,46 @@
+﻿
+@page "/"
+
+@inject ISignalRService service
+@inject NavigationManager NavManager
+
+
+@if (username == "")
+{
+    <h3>Login</h3>
+
+    <div class="form-group">
+        <label>
+            User:
+            <input @bind="usernameInput" />
+        </label>
+    </div>
+
+    <button @onclick="OnLogin">Login</button>
+
+    <hr>
+}
+else
+{
+    <Chat Username="@username" />
+}
+
+
+
+@code {
+
+    private string usernameInput;
+
+    private string username = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await service.Connect();
+    }
+
+    private async Task OnLogin()
+    {
+        username = await service.Login(usernameInput);
+    }
+
+}

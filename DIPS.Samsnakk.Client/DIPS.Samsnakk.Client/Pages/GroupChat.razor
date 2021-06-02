@@ -1,0 +1,58 @@
+﻿@inject ISignalRService service;
+
+<div class="modal">
+    <div class="modal-content">
+        <span @onclick="CloseModal" class="closeModal">&times;</span>
+        <h1>Chat with @Group.GroupName</h1>
+        <br />
+        @foreach (string message in messages)
+        {
+            <div>@message</div>
+        }
+
+        <input @bind-value="@message" type="text" placeholder="Send message" style="display:inline-block" />
+        <button style="display:inline-block" @onclick="@SendMessage">Submit</button>
+
+
+    </div>
+</div>
+
+@code {
+
+    [Parameter]
+    public Group Group { get; set; }
+
+    [Parameter]
+    public EventCallback<Group> GroupChanged { get; set; }
+
+    [Parameter]
+    public string Username { get; set; }
+
+    private List<string> messages = new List<string>();
+
+    private string message;
+
+    protected override async Task OnInitializedAsync()
+    {
+        messages = await service.GetGroupMessages(Group.GroupName);
+
+        service.GetConnection().On<string>("ReceiveMessage", x =>
+        {
+            messages.Add(x);
+
+            StateHasChanged();
+        });
+    }
+
+    private void CloseModal()
+    {
+        GroupChanged.InvokeAsync(null);
+        StateHasChanged();
+    }
+
+    private async Task SendMessage()
+    {
+        await service.SendMessage(Group.GroupName, message, Username);
+        message = "";
+    }
+}

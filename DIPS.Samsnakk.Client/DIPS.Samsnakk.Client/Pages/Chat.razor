@@ -1,0 +1,219 @@
+﻿<h3>Chat</h3>
+
+@inject ISignalRService service
+
+@page "/Chat"
+
+<h2>Logged in as @Username</h2>
+
+    @foreach (var user in Users)
+    {
+        if (user.Username == Username)
+            continue;
+
+<div>
+    <button style="display:inline-block" @onclick="@(() => OnClickedUser(user))">@user.Username</button>
+    @if (user.Online)
+    {
+        <i class="fas fa-circle" style="color:green"></i>
+    }
+    else
+    {
+        <i class="fas fa-circle" style="color:black"></i>
+    }
+    @if (Notifications.Count > 0 && Notifications.Contains(user.Username))
+    {
+        <i style="display:inline-block" class="fas fa-envelope" />
+    }
+
+
+</div>
+       
+    }
+
+<div style="float:right">
+    <h1>Groups</h1>
+    <div>
+        <input @bind="@groupInput" placeholder="Input group name" type="text" />
+        <button @onclick="(() => AddGroup())">Add group</button>
+    </div>
+
+    @if(Groups.Count > 0)
+    {
+        <h3>Join groups</h3>
+    }
+    @{
+        foreach (Group group in Groups)
+        {
+            if (JoinedGroups.Any(x => x.GroupName == group.GroupName))
+                continue;
+
+            <div>
+
+                <button @onclick="(() => JoinGroup(group))">Join @group.GroupName</button>
+            </div>
+
+        }
+    }
+
+    @if(JoinedGroups.Count > 0)
+    {
+        <h2>Joined groups</h2>
+    }
+    @{
+        foreach (Group group in JoinedGroups)
+        {
+        <div>
+
+            <button style="display:inline-block" @onclick="(() => OnClickedGroup(group))">@group.GroupName</button>
+            @if (Notifications.Count > 0 && Notifications.Contains(group.GroupName))
+            {
+                <i style="display:inline-block" class="fas fa-envelope" />
+            }
+
+        </div>
+
+        }
+    }
+
+</div>
+
+
+@if (selectedUser != null)
+{
+    <UserChat @key="selectedUser" @bind-User="@selectedUser" />
+}
+
+@if(selectedGroup != null){
+    <GroupChat @key="selectedGroup" @bind-Group="@selectedGroup" Username="@Username" />
+}
+
+
+@code {
+
+    [Parameter]
+    public string Username { get; set; }
+
+    public List<User> Users { get; set; } = new List<User>();
+
+    private List<Group> Groups { get; set; } = new List<Group>();
+
+    private List<Group> JoinedGroups { get; set; } = new List<Group>();
+
+    private List<string> Notifications { get; set; } = new List<string>();
+
+    private User selectedUser;
+    private Group selectedGroup;
+
+    private string groupInput;
+
+    protected override async Task OnInitializedAsync()
+    {
+        service.GetConnection().On<List<Group>>("OnGetJoinedGroups", x =>
+        {
+            JoinedGroups = x;
+
+            StateHasChanged();
+
+        });
+
+        service.GetConnection().On<List<Group>>("OnGetGroups", x =>
+        {
+            Groups = x;
+
+            StateHasChanged();
+
+        });
+
+        service.GetConnection().On<List<User>>("OnGetUsers", x =>
+        {
+            Users = x;
+
+            StateHasChanged();
+
+        });
+
+        service.GetConnection().On<List<string>>("ReceiveNotifications", async x =>
+        {
+            var notification = "";
+
+            if(selectedUser != null)
+            {
+                notification = x.FirstOrDefault(x => x == selectedUser.Username);
+                x.Remove(notification);
+            }
+
+            if(selectedGroup != null)
+            {
+                notification = x.FirstOrDefault(x => x == selectedGroup.GroupName);
+                x.Remove(notification);
+            }
+
+            Notifications = x;
+
+            await service.UpdateNotifications(Notifications);
+
+            StateHasChanged();
+
+        });
+
+
+        await service.GetUsers();
+        await service.GetGroups();
+
+        Notifications = await service.GetNotifications();
+    }
+
+    private async Task OnClickedUser(User user)
+    {
+
+        selectedUser = new User()
+        {
+            Id = user.Id,
+            Username = user.Username
+        };
+
+        if (Notifications.Contains(user.Username))
+        {
+            Notifications.Remove(user.Username);
+
+            await service.UpdateNotifications(Notifications);
+        }
+
+
+        StateHasChanged();
+
+    }
+
+    private async Task OnClickedGroup(Group group)
+    {
+
+        selectedGroup = new Group()
+        {
+            GroupName = group.GroupName
+        };
+
+        if (Notifications.Contains(group.GroupName))
+        {
+            Notifications.Remove(group.GroupName);
+
+            await service.UpdateNotifications(Notifications);
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task JoinGroup(Group group)
+    {
+        await service.JoinGroup(group.GroupName);
+    }
+
+    private async Task AddGroup()
+    {
+        await service.AddGroup(groupInput);
+
+        groupInput = "";
+    }
+
+
+}

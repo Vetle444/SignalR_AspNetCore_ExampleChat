@@ -1,0 +1,57 @@
+﻿@inject ISignalRService service;
+
+    <div class="modal">
+        <div class="modal-content">
+            <span @onclick="CloseModal" class="closeModal">&times;</span>
+            <h1>Chat with @User.Username</h1>
+            <br />
+            @foreach(string message in messages)
+            {
+                <div>@message</div>
+            }
+
+            <input @bind-value="@message" type="text" placeholder="Send message" style="display:inline-block"/> 
+            <button style="display:inline-block" @onclick="@SendMessage">Submit</button>
+
+
+        </div>
+    </div>
+
+@code {
+
+    [Parameter]
+    public User User { get; set; }
+
+    [Parameter]
+    public EventCallback<User> UserChanged { get; set; }
+
+    private bool hideModal = false;
+
+    private List<string> messages = new List<string>();
+
+    private string message;
+
+    protected override async Task OnInitializedAsync()
+    {
+        messages = await service.GetMessages(User.Username);
+
+        service.GetConnection().On<string>("ReceiveMessage", x =>
+        {
+            messages.Add(x);
+
+            StateHasChanged();
+        });
+    }
+
+    private void CloseModal()
+    {
+        UserChanged.InvokeAsync(null);
+        StateHasChanged();
+    }
+
+    private async Task SendMessage()
+    {
+        await service.SendMessage(User.Username, message);
+        message = "";
+    }
+}
